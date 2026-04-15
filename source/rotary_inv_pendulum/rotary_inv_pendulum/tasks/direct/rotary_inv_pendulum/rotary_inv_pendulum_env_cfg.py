@@ -15,15 +15,21 @@ from isaaclab.utils import configclass
 @configclass
 class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
     # env
-    decimation = 2
-    episode_length_s = 5.0
-    # - spaces definition
-    action_space = 1
-    observation_space = 4
+    
+    # decimation = 2 # default - from cartpole template
+    decimation = 8 # from pend_balc_env.py
+
+    # episode_length_s = 5.0 # default - from cartpole template
+    episode_length_s = 20.0  # from pend_balc_env.py
+
+    # - spaces definition - from pend_balc_env.py
+    action_space = 2        # [τ1, τ2]
+    observation_space = 6   # [sin J1, cos J1, sin J2, cos J2, ω1, ω2]
     state_space = 0
 
     # simulation
-    sim: SimulationCfg = SimulationCfg(dt=1 / 120, render_interval=decimation)
+    # sim: SimulationCfg = SimulationCfg(dt=1 / 120, render_interval=decimation) # default - from template
+    sim: SimulationCfg = SimulationCfg(dt=1 / 800, render_interval=decimation) # copied from pend_balc_env.py
 
     # robot(s)
     robot_cfg: ArticulationCfg = CARTPOLE_CFG.replace(prim_path="/World/envs/env_.*/Robot")
