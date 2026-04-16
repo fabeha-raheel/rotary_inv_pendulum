@@ -13,7 +13,7 @@ from . import agents
 
 
 gym.register(
-    id="Template-Rotary-Inv-Pendulum-Direct-v0",
+    id="Isaac-Rotary-Inv-Pendulum-Direct-v0",
     entry_point=f"{__name__}.rotary_inv_pendulum_env:RotaryInvPendulumEnv",
     disable_env_checker=True,
     kwargs={

@@ -2,7 +2,7 @@ import os
 import isaaclab.sim as sim_utils
 from isaaclab.assets import ArticulationCfg
 from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+# from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 PEND_BALC_CONFIG = ArticulationCfg(
         prim_path="/World/envs/env_.*/Robot",
@@ -44,3 +44,6 @@ PEND_BALC_CONFIG = ArticulationCfg(
                 damping=0.0,
     ),},              # raw torque control
     )
+
+# Check correct file path
+# print(os.path.join(os.path.dirname(__file__), "pend_balc", "pend_balc.usd"))
