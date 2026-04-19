@@ -46,6 +46,7 @@ class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
     # cart_dof_name = "slider_to_cart"
     # pole_dof_name = "cart_to_pole"
     dof_names = ["Joint1", "Joint2"] # names of controllable joints of rotary_inv_pendulum
+    target_joint2 = 0.0
     # - action scale
     # action_scale = 100.0  # [N] # no action scales were provided in pend_balc
     # - reward scales

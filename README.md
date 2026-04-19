@@ -1,4 +1,36 @@
-# Template for Isaac Lab Projects
+# Rotary Inverted Pendulum with RL
+
+## Issues
+
+#### Problem pushing Large .vscode/browse.vc.db files to GitHub
+
+If the large files have been commited to git in the last commit, they can be cleared using the following command:
+
+```bash
+git rm --cached .vscode/browse.vc.db*
+```
+
+If they have been committed over several commits, use the following command with caution:
+
+```bash
+git filter-branch --force --index-filter "git rm --cached --ignore-unmatch .vscode/browse.vc.db" --prune-empty --tag-name-filter cat -- --all
+```
+
+Then add the following in gitignore to ignore the files in future commits:
+
+```xml
+**/.vscode/browse.vc.db**
+```
+
+Then force push the code to github:
+
+```bash
+git push origin main --force
+```
+
+Based on the IsaacLab template, .vscode should not be set in gitignore. 
+
+<!-- # Template for Isaac Lab Projects
 
 ## Overview
 
@@ -132,4 +164,4 @@ Some examples of packages that can likely be excluded are:
 "<path-to-isaac-sim>/extscache/omni.graph.*"        // Graph UI tools
 "<path-to-isaac-sim>/extscache/omni.services.*"     // Services tools
 ...
-```
+``` -->

@@ -7,7 +7,7 @@ from isaaclab.actuators import ImplicitActuatorCfg
 PEND_BALC_CONFIG = ArticulationCfg(
         prim_path="/World/envs/env_.*/Robot",
         spawn=sim_utils.UsdFileCfg(
-            usd_path=os.path.join(os.path.dirname(__file__), "pend_balc", "pend_balc.usd"),
+            usd_path="/home/fabeha/isaaclab_projects/rotary_inv_pendulum/source/rotary_inv_pendulum/rotary_inv_pendulum/robots/pend_balc/urdf/pend_balc.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 rigid_body_enabled=True,
                 max_linear_velocity=1000.0,
@@ -23,7 +23,7 @@ PEND_BALC_CONFIG = ArticulationCfg(
                 stabilization_threshold=0.001,
                 fix_root_link=True,    # pins base_link to world
             ),
-        ),
+            ),
         init_state=ArticulationCfg.InitialStateCfg(
             pos=(0.0, 0.0, 0.0),
             joint_pos={"Joint1": 0.5, "Joint2": 1.5},

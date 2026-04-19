@@ -25,8 +25,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         super().__init__(cfg, render_mode, **kwargs)
 
         # self.dof_idx, _ = self.robot.find_joints(self.cfg.dof_names)
-        self._joint1_idx, _ = self._robot.find_joints("Joint1")
-        self._joint2_idx, _ = self._robot.find_joints("Joint2")
+        self._joint1_idx, _ = self.robot.find_joints("Joint1")
+        self._joint2_idx, _ = self.robot.find_joints("Joint2")
 
         # self.joint_pos = self.robot.data.joint_pos
         # self.joint_vel = self.robot.data.joint_vel
@@ -37,6 +37,7 @@ class RotaryInvPendulumEnv(DirectRLEnv):
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot_cfg)
+        self.scene.articulations["robot"] = self.robot 
 
         # add ground plane
         spawn_ground_plane(prim_path="/World/ground", cfg=GroundPlaneCfg())
@@ -62,16 +63,16 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         self.actions = actions.clone().clamp(-1.0, 1.0)
         torques = self._actions * 48.0
 
-        tau = torch.zeros(self.num_envs, self._robot.num_joints, device=self.device)
+        tau = torch.zeros(self.num_envs, self.robot.num_joints, device=self.device)
         tau[:, self._joint1_idx] = torques[:, 0:1]   # rotating arm
         tau[:, self._joint2_idx] = torques[:, 1:2]   # pendulum
 
-        self._robot.set_joint_effort_target(tau)
+        self.robot.set_joint_effort_target(tau)
 
     def _apply_action(self) -> None:
         # self.robot.set_joint_effort_target(self.actions * self.cfg.action_scale, joint_ids=self._cart_dof_idx)
 
-        self._robot.write_data_to_sim()
+        self.robot.write_data_to_sim()
 
     def _get_observations(self) -> dict:
         # obs = torch.cat(
@@ -85,8 +86,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # )
 
         # observations copied from pend_balc_env.py
-        j_pos = self._robot.data.joint_pos
-        j_vel = self._robot.data.joint_vel
+        j_pos = self.robot.data.joint_pos
+        j_vel = self.robot.data.joint_vel
 
         j1 = j_pos[:, self._joint1_idx[0]]
         j2 = j_pos[:, self._joint2_idx[0]]
@@ -119,8 +120,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # )
 
         # rewards copied from pend_balc_env.py
-        j_pos = self._robot.data.joint_pos
-        j_vel = self._robot.data.joint_vel
+        j_pos = self.robot.data.joint_pos
+        j_vel = self.robot.data.joint_vel
 
         j2 = j_pos[:, self._joint2_idx[0]]
         w1 = j_vel[:, self._joint1_idx[0]]
@@ -176,7 +177,7 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # out_of_bounds = out_of_bounds | torch.any(torch.abs(self.joint_pos[:, self._pole_dof_idx]) > math.pi / 2, dim=1)
 
         # termination conditions copied from pend_balc_env.py
-        j_pos = self._robot.data.joint_pos
+        j_pos = self.robot.data.joint_pos
 
         j2 = j_pos[:, self._joint2_idx[0]]
 
@@ -223,8 +224,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         noise = 0.1
         n = len(env_ids)
 
-        joint_pos = torch.zeros(n, self._robot.num_joints, device=self.device)
-        joint_vel = torch.zeros(n, self._robot.num_joints, device=self.device)
+        joint_pos = torch.zeros(n, self.robot.num_joints, device=self.device)
+        joint_vel = torch.zeros(n, self.robot.num_joints, device=self.device)
 
         # Joint1: random start angle + random initial spin (helps discover Furuta behavior)
         #joint_pos[:, self._joint1_idx[0]] = (torch.rand(n, device=self.device) - 0.5) * 2 * math.pi
@@ -239,8 +240,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
             (torch.rand(n, device=self.device) - 0.5) * 2 * noise
         joint_vel[:, self._joint2_idx[0]] = 0.0
 
-        self._robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
-        self._robot.reset(env_ids)
+        self.robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
+        self.robot.reset(env_ids)
 
 
 # @torch.jit.script
