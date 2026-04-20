@@ -34,6 +34,17 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # Pre-allocate action buffer
         self._actions = torch.zeros(self.num_envs, self.cfg.action_space,
                                     device=self.device)
+        
+        # Calculate how many policy steps make up 5.0 seconds
+        # Policy step duration = sim.dt * decimation
+        policy_step_dt = self.cfg.sim.dt * self.cfg.decimation
+        self._disturbance_interval_policy_steps = int(self.cfg.disturbance_interval_s / policy_step_dt)
+        
+        # Tracks how many physics steps of "pushing" are left for each env
+        self._disturbance_counter = torch.zeros(self.num_envs, device=self.device)
+        
+        # Holds the randomly sampled torque (-2 to 2) for the current kick
+        self._current_disturbance_torque = torch.zeros(self.num_envs, device=self.device)
 
     def _setup_scene(self):
         self.robot = Articulation(self.cfg.robot_cfg)
@@ -49,23 +60,47 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         if self.device == "cpu":
             self.scene.filter_collisions(global_prim_paths=[])
         
-        # add articulation to scene
-        # this line has been commented because it was not present in the pend_balc_env.py file
-        # self.scene.articulations["robot"] = self.robot 
-        
         # add lights
-        light_cfg = sim_utils.DomeLightCfg(intensity=2000.0, color=(0.75, 0.75, 0.75))
+        light_cfg = sim_utils.DomeLightCfg(intensity=1000.0, color=(0.75, 0.75, 0.75))
         light_cfg.func("/World/Light", light_cfg)
 
     def _pre_physics_step(self, actions: torch.Tensor) -> None:
 
         # scale network output ±1 → ±48 Nm and apply to joints.
         self.actions = actions.clone().clamp(-1.0, 1.0)
-        torques = self._actions * 48.0
+        # torques = self._actions * 48.0
 
         tau = torch.zeros(self.num_envs, self.robot.num_joints, device=self.device)
-        tau[:, self._joint1_idx] = torques[:, 0:1]   # rotating arm
-        tau[:, self._joint2_idx] = torques[:, 1:2]   # pendulum
+        # tau[:, self._joint1_idx] = torques[:, 0:1]   # rotating arm
+        # tau[:, self._joint2_idx] = torques[:, 1:2]   # pendulum
+
+        # 1. Normal Motor Control (Joint1)
+        tau[:, self._joint1_idx] = self._actions[:, 0:1] * 48.0
+
+        # 2. Scheduled Recurring Disturbance (Joint2)
+        if self.cfg.enable_disturbance:
+            # Trigger every N policy steps (and ensure we don't trigger at step 0)
+            just_reached = (self.episode_length_buf > 0) & \
+                           (self.episode_length_buf % self._disturbance_interval_policy_steps == 0)
+
+            # Start the countdown for triggered envs
+            self._disturbance_counter[just_reached] = self.cfg.disturbance_duration_steps
+
+            # Sample random torque between -2 and 2 for the triggered envs
+            min_t, max_t = self.cfg.disturbance_range_nm
+            random_torques = min_t + (max_t - min_t) * torch.rand(self.num_envs, device=self.device)
+            
+            # Save the rolled torque so it applies consistently for the duration of the push
+            self._current_disturbance_torque[just_reached] = random_torques[just_reached]
+
+            # Apply force to any env where the countdown is > 0
+            active = self._disturbance_counter > 0
+            if active.any():
+                dist_tau = self._current_disturbance_torque * active.float()
+                tau[:, self._joint2_idx[0]] += dist_tau
+
+                # Count down one physics step
+                self._disturbance_counter[active] -= 1
 
         self.robot.set_joint_effort_target(tau)
 
@@ -86,20 +121,42 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # )
 
         # observations copied from pend_balc_env.py
-        j_pos = self.robot.data.joint_pos
-        j_vel = self.robot.data.joint_vel
+        # j_pos = self.robot.data.joint_pos
+        # j_vel = self.robot.data.joint_vel
+
+        # j1 = j_pos[:, self._joint1_idx[0]]
+        # j2 = j_pos[:, self._joint2_idx[0]]
+        # w1 = j_vel[:, self._joint1_idx[0]]
+        # w2 = j_vel[:, self._joint2_idx[0]]
+
+        # # sin/cos avoids discontinuity at ±π boundary
+        # obs = torch.stack([
+        #     torch.sin(j1), torch.cos(j1),   # Joint1 orientation
+        #     torch.sin(j2), torch.cos(j2),   # Joint2 orientation (controlled)
+        #     w1,                              # Joint1 angular velocity
+        #     w2,                              # Joint2 angular velocity
+        # ], dim=-1)
+
+        # observations from GTech AE4610
+        j_pos = self._robot.data.joint_pos
+        j_vel = self._robot.data.joint_vel
 
         j1 = j_pos[:, self._joint1_idx[0]]
         j2 = j_pos[:, self._joint2_idx[0]]
         w1 = j_vel[:, self._joint1_idx[0]]
         w2 = j_vel[:, self._joint2_idx[0]]
 
-        # sin/cos avoids discontinuity at ±π boundary
+        # Shortest path error logic (wraps between -pi and pi)
+        # Using atan2(sin(delta), cos(delta))
+        diff = j1 - self.cfg.target_joint1
+        j1_error = torch.atan2(torch.sin(diff), torch.cos(diff))
+
+
         obs = torch.stack([
-            torch.sin(j1), torch.cos(j1),   # Joint1 orientation
-            torch.sin(j2), torch.cos(j2),   # Joint2 orientation (controlled)
-            w1,                              # Joint1 angular velocity
-            w2,                              # Joint2 angular velocity
+            torch.sin(j1), torch.cos(j1),
+            torch.sin(j2), torch.cos(j2),
+            w1, w2,
+            j1_error,   # The 'compass' telling the AI which way to return home
         ], dim=-1)
 
         observations = {"policy": obs}
@@ -120,17 +177,72 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # )
 
         # rewards copied from pend_balc_env.py
-        j_pos = self.robot.data.joint_pos
-        j_vel = self.robot.data.joint_vel
+        # j_pos = self.robot.data.joint_pos
+        # j_vel = self.robot.data.joint_vel
 
+        # j2 = j_pos[:, self._joint2_idx[0]]
+        # w1 = j_vel[:, self._joint1_idx[0]]
+        # w2 = j_vel[:, self._joint2_idx[0]]
+
+        # j2_error = j2 - self.cfg.target_joint2
+
+        # # Stability factor: 1.0 at target, 0.0 at limit
+        # stability = 1.0 - (j2_error.abs() / self.cfg.max_angle_j2).clamp(0.0, 1.0)
+
+        # # 1. Alive bonus
+        # r_alive = self.cfg.rew_scale_alive
+
+        # # 2. Joint2 angle penalty
+        # r_j2_angle = self.cfg.rew_scale_j2_angle * (1.0 - torch.cos(j2_error))
+
+        # # 3. Direction-aware Joint1 reward
+        # #    Reward joint1 for spinning in the CORRECT direction to correct joint2
+        # #    If j2_error > 0 (falling right): want w1 < 0 (CCW) → reward -w1
+        # #    If j2_error < 0 (falling left):  want w1 > 0 (CW)  → reward +w1
+        # #    This equals: reward = -sign(j2_error) * w1
+        # #    When near zero error, reward |w1| so it keeps spinning freely
+        # # correction_spin = -torch.sign(j2_error) * w1        # directional component
+        # correction_spin = -j2_error * w1
+
+        # free_spin       = w1.abs() * (1.0 - j2_error.abs()  # free spinning near center
+        #                   / self.cfg.max_angle_j2).clamp(0.0, 1.0)
+
+        # r_j1_vel = self.cfg.rew_scale_j1_vel * (
+        #     correction_spin * j2_error.abs() / self.cfg.max_angle_j2  # direction matters when far
+        #     + free_spin                                                  # free spin when near center
+        # )
+
+        # # 4. Joint1 stop penalty when joint2 near limit
+        # r_j1_stop = self.cfg.rew_scale_j1_stop * w1.abs() * (1.0 - stability)
+
+        # # 5. Joint2 velocity penalty
+        # r_j2_vel = self.cfg.rew_scale_j2_vel * w2.pow(2)
+
+        # # 6. Joint2 action penalty
+        # r_j2_act = self.cfg.rew_scale_j2_action * self._actions[:, 1].pow(2)
+
+        # total_reward = r_alive + r_j2_angle + r_j1_vel + r_j1_stop + r_j2_vel + r_j2_act
+        
+        # rewards from GTech AE4610
+        j_pos = self._robot.data.joint_pos
+        j_vel = self._robot.data.joint_vel
+
+        j1 = j_pos[:, self._joint1_idx[0]] 
         j2 = j_pos[:, self._joint2_idx[0]]
         w1 = j_vel[:, self._joint1_idx[0]]
         w2 = j_vel[:, self._joint2_idx[0]]
 
+        # Calculate wrapped error for the reward calculation
+        diff = j1 - self.cfg.target_joint1
+        j1_error = torch.atan2(torch.sin(diff), torch.cos(diff))
+
         j2_error = j2 - self.cfg.target_joint2
 
-        # Stability factor: 1.0 at target, 0.0 at limit
-        stability = 1.0 - (j2_error.abs() / self.cfg.max_angle_j2).clamp(0.0, 1.0)
+        # How far from upright: 0 = balanced, 1 = at limit
+        normalized_error = (j2_error.abs() / self.cfg.max_angle_j2).clamp(0.0, 1.0)
+
+        # How balanced: 1 = upright, 0 = at limit
+        is_balanced = 1.0 - normalized_error
 
         # 1. Alive bonus
         r_alive = self.cfg.rew_scale_alive
@@ -138,34 +250,35 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # 2. Joint2 angle penalty
         r_j2_angle = self.cfg.rew_scale_j2_angle * (1.0 - torch.cos(j2_error))
 
-        # 3. Direction-aware Joint1 reward
-        #    Reward joint1 for spinning in the CORRECT direction to correct joint2
-        #    If j2_error > 0 (falling right): want w1 < 0 (CCW) → reward -w1
-        #    If j2_error < 0 (falling left):  want w1 > 0 (CW)  → reward +w1
-        #    This equals: reward = -sign(j2_error) * w1
-        #    When near zero error, reward |w1| so it keeps spinning freely
-        # correction_spin = -torch.sign(j2_error) * w1        # directional component
-        correction_spin = -j2_error * w1
+        # 3. Opposition reward (velocity-based)
+        # Joint2 moving CW (+w2) → Joint1 must move CCW (-w1) → -w2*w1 is positive
+        # Joint2 moving CCW (-w2) → Joint1 must move CW  (+w1) → -w2*w1 is positive
+        # Joint2 still (w2≈0) → signal ≈ 0 → neutral
+        opposing_signal = w2 * w1
 
-        free_spin       = w1.abs() * (1.0 - j2_error.abs()  # free spinning near center
-                          / self.cfg.max_angle_j2).clamp(0.0, 1.0)
+        # Reward when opposing (positive signal), scale by how much J2 is falling
+        r_j1_oppose = self.cfg.rew_scale_j1_oppose * \
+            torch.clamp(opposing_signal, min=0.0) * normalized_error
 
-        r_j1_vel = self.cfg.rew_scale_j1_vel * (
-            correction_spin * j2_error.abs() / self.cfg.max_angle_j2  # direction matters when far
-            + free_spin                                                  # free spin when near center
-        )
+        # Penalize when moving same direction (negative signal)
+        r_j1_same = self.cfg.rew_scale_j1_same * \
+            torch.clamp(opposing_signal, max=0.0) * normalized_error
 
-        # 4. Joint1 stop penalty when joint2 near limit
-        r_j1_stop = self.cfg.rew_scale_j1_stop * w1.abs() * (1.0 - stability)
+        # 4. When Joint2 balanced, Joint1 should stay still
+        r_j1_still = self.cfg.rew_scale_j1_still * w1.abs() * is_balanced
 
         # 5. Joint2 velocity penalty
         r_j2_vel = self.cfg.rew_scale_j2_vel * w2.pow(2)
 
-        # 6. Joint2 action penalty
-        r_j2_act = self.cfg.rew_scale_j2_action * self._actions[:, 1].pow(2)
+        # 6. Joint1 action penalty (action_space=1, only index 0)
+        r_j1_act = self.cfg.rew_scale_j1_action * self._actions[:, 0].pow(2)
 
-        total_reward = r_alive + r_j2_angle + r_j1_vel + r_j1_stop + r_j2_vel + r_j2_act
-        
+        # 7. Joint1 Position Penalty
+        # This forces the arm to find a balance point at exactly target_joint1
+        r_j1_pos = self.cfg.rew_scale_j1_pos * j1_error.pow(2)
+
+        total_reward = r_alive + r_j2_angle + r_j1_oppose + r_j1_same + r_j1_still + r_j2_vel + r_j1_act + r_j1_pos
+
         return total_reward
 
     def _get_dones(self) -> tuple[torch.Tensor, torch.Tensor]:
@@ -221,6 +334,10 @@ class RotaryInvPendulumEnv(DirectRLEnv):
 
         super()._reset_idx(env_ids)
 
+        # Reset the disturbance trackers
+        self._disturbance_counter[env_ids] = 0.0
+        self._current_disturbance_torque[env_ids] = 0.0
+
         noise = 0.1
         n = len(env_ids)
 
@@ -228,12 +345,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         joint_vel = torch.zeros(n, self.robot.num_joints, device=self.device)
 
         # Joint1: random start angle + random initial spin (helps discover Furuta behavior)
-        #joint_pos[:, self._joint1_idx[0]] = (torch.rand(n, device=self.device) - 0.5) * 2 * math.pi
-        #joint_vel[:, self._joint1_idx[0]] = (torch.rand(n, device=self.device) - 0.5) * 4.0  # ±2 rad/s
-        
         joint_pos[:, self._joint1_idx[0]] = (torch.rand(n, device=self.device) - 0.5) * 2 * math.pi
-        joint_vel[:, self._joint1_idx[0]] = (torch.rand(n, device=self.device) - 0.5) * 6.0  # ±3 rad/s both directions
-
+        joint_vel[:, self._joint1_idx[0]] = (torch.rand(n, device=self.device) - 0.5) * 6.0
 
         # Joint2: near upright ± small noise
         joint_pos[:, self._joint2_idx[0]] = self.cfg.target_joint2 + \

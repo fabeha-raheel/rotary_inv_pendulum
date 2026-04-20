@@ -32,7 +32,7 @@ class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
 
     # - spaces definition - from GTech AE4610 (https://gtae.gitbook.io/ae4610/lab-4-rotary-inverted-pendulum/d.-reinforcement-learning-controller-demo)
     action_space = 1        # only τ1 (Joint1 motor) # from GTech AE4610
-    observation_space = 7   # [sin J1, cos J1, sin J2, cos J2, ω1, ω2]
+    observation_space = 7   # [sin J1, cos J1, sin J2, cos J2, ω1, ω2, J1_error]
     state_space = 0
 
     # simulation
