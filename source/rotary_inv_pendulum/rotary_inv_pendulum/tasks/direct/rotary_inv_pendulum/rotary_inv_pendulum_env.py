@@ -134,7 +134,7 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         r_j1_pos = self.cfg.rew_scale_j1_pos * j1_error.pow(2)
 
         # 7. Constraint Violations
-        r_violated = self.cfg.rew_scale_violation * ((j1_error.abs() > self.cfg.ji_max) | 
+        r_violated = self.cfg.rew_scale_violation * ((j1_error.abs() > self.cfg.j1_max) | 
                                                       (j2_error.abs() > self.cfg.j2_max)
                                                       ).float()
 
@@ -208,18 +208,18 @@ class RotaryInvPendulumEnv(DirectRLEnv):
 
         # Joint1: random start angle + random initial spin (helps discover Furuta behavior)
         joint_pos[:, self._joint1_idx[0]] = (
-            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self._reset_j1_pos_range
+            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self.cfg._reset_j1_pos_range
         )
         joint_vel[:, self._joint1_idx[0]] = (
-            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self._reset_j1_vel_range
+            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self.cfg._reset_j1_vel_range
         )
 
         # Joint2: near upright with small angle noise and small initial angular velocity
         joint_pos[:, self._joint2_idx[0]] = self.cfg.target_joint2 + (
-            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self._reset_j2_pos_noise
+            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self.cfg._reset_j2_pos_noise
         )
         joint_vel[:, self._joint2_idx[0]] = (
-            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self._reset_j2_vel_range
+            (torch.rand(n, device=self.device) - 0.5) * 2.0 * self.cfg._reset_j2_vel_range
         )
 
         self.robot.write_joint_state_to_sim(joint_pos, joint_vel, env_ids=env_ids)
