@@ -32,7 +32,7 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # self.joint_vel = self.robot.data.joint_vel
 
         # Pre-allocate action buffer
-        self._actions = torch.zeros(self.num_envs, self.cfg.action_space,
+        self.actions = torch.zeros(self.num_envs, self.cfg.action_space,
                                     device=self.device)
         
         # Calculate how many policy steps make up 5.0 seconds
@@ -68,14 +68,14 @@ class RotaryInvPendulumEnv(DirectRLEnv):
 
         # scale network output ±1 → ±48 Nm and apply to joints.
         self.actions = actions.clone().clamp(-1.0, 1.0)
-        # torques = self._actions * 48.0
+        # torques = self.actions * 48.0
 
         tau = torch.zeros(self.num_envs, self.robot.num_joints, device=self.device)
         # tau[:, self._joint1_idx] = torques[:, 0:1]   # rotating arm
         # tau[:, self._joint2_idx] = torques[:, 1:2]   # pendulum
 
         # 1. Normal Motor Control (Joint1)
-        tau[:, self._joint1_idx] = self._actions[:, 0:1] * 48.0
+        tau[:, self._joint1_idx] = self.actions[:, 0:1] * 48.0
 
         # 2. Scheduled Recurring Disturbance (Joint2)
         if self.cfg.enable_disturbance:
@@ -138,8 +138,8 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # ], dim=-1)
 
         # observations from GTech AE4610
-        j_pos = self._robot.data.joint_pos
-        j_vel = self._robot.data.joint_vel
+        j_pos = self.robot.data.joint_pos
+        j_vel = self.robot.data.joint_vel
 
         j1 = j_pos[:, self._joint1_idx[0]]
         j2 = j_pos[:, self._joint2_idx[0]]
@@ -219,13 +219,13 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         # r_j2_vel = self.cfg.rew_scale_j2_vel * w2.pow(2)
 
         # # 6. Joint2 action penalty
-        # r_j2_act = self.cfg.rew_scale_j2_action * self._actions[:, 1].pow(2)
+        # r_j2_act = self.cfg.rew_scale_j2_action * self.actions[:, 1].pow(2)
 
         # total_reward = r_alive + r_j2_angle + r_j1_vel + r_j1_stop + r_j2_vel + r_j2_act
         
         # rewards from GTech AE4610
-        j_pos = self._robot.data.joint_pos
-        j_vel = self._robot.data.joint_vel
+        j_pos = self.robot.data.joint_pos
+        j_vel = self.robot.data.joint_vel
 
         j1 = j_pos[:, self._joint1_idx[0]] 
         j2 = j_pos[:, self._joint2_idx[0]]
@@ -271,7 +271,7 @@ class RotaryInvPendulumEnv(DirectRLEnv):
         r_j2_vel = self.cfg.rew_scale_j2_vel * w2.pow(2)
 
         # 6. Joint1 action penalty (action_space=1, only index 0)
-        r_j1_act = self.cfg.rew_scale_j1_action * self._actions[:, 0].pow(2)
+        r_j1_act = self.cfg.rew_scale_j1_action * self.actions[:, 0].pow(2)
 
         # 7. Joint1 Position Penalty
         # This forces the arm to find a balance point at exactly target_joint1
