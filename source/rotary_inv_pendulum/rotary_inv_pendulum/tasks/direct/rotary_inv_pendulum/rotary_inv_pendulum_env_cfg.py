@@ -22,8 +22,8 @@ class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
     # decimation = 2 # default - from cartpole template
     decimation = 8 # from pend_balc_env.py
 
-    # episode_length_s = 5.0 # default - from cartpole template
-    episode_length_s = 20.0  # from pend_balc_env.py
+    episode_length_s = 5.0 # default - from cartpole template
+    # episode_length_s = 20.0  # from pend_balc_env.py
 
     # - spaces definition - from pend_balc_env.py
     # action_space = 2        # [τ1, τ2]
@@ -55,9 +55,12 @@ class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
     # - joint target angles - from GTech AE4610
     target_joint1 = 0.0     # Target angle for the arm (e.g., center)
     target_joint2 = 0.0     # Joint2 must stay vertical (0 rad)
+    j1_max = 1.571          # Joint1 max range is +- pi/2 rad 
+    j2_max = 0.436          # Joint2 (pendulum) max angle is kept as 25 deg = 0.436 rad
 
     # - action scale
     # action_scale = 100.0  # [N] # no action scales were provided in pend_balc
+    action_scale = 48.0     # ±48 Nm torque scale
     
     # - reward scales - from pend_balc.py
     # rew_scale_alive     = 1.0
@@ -68,14 +71,23 @@ class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
     # rew_scale_j2_action = -0.01  # penalize large τ2 torques
 
     # - reward scales - - from GTech AE4610
-    rew_scale_alive      =  1.0   # bonus for keeping Joint2 upright
-    rew_scale_j2_angle   = -5.0   # penalty for Joint2 deviating from 0
-    rew_scale_j2_vel     = -0.05  # penalty for fast Joint2 motion
-    rew_scale_j1_oppose  = -2.0   # reward Joint1 moving OPPOSITE to Joint2 fall
-    rew_scale_j1_same    =  3.0   # heavy penalty for moving SAME direction as fall
-    rew_scale_j1_still   = -0.3   # penalty for Joint1 moving when Joint2 balanced
-    rew_scale_j1_action  = -0.01  # penalty for large τ1 torques
-    rew_scale_j1_pos     = -0.5   # Penalty for the Joint1 being away from target
+    # rew_scale_alive      =  1.0   # bonus for keeping Joint2 upright
+    # rew_scale_j2_angle   = -5.0   # penalty for Joint2 deviating from 0
+    # rew_scale_j2_vel     = -0.05  # penalty for fast Joint2 motion
+    # rew_scale_j1_oppose  = -2.0   # reward Joint1 moving OPPOSITE to Joint2 fall
+    # rew_scale_j1_same    =  3.0   # heavy penalty for moving SAME direction as fall
+    # rew_scale_j1_still   = -0.3   # penalty for Joint1 moving when Joint2 balanced
+    # rew_scale_j1_action  = -0.01  # penalty for large τ1 torques
+    # rew_scale_j1_pos     = -0.5   # Penalty for the Joint1 being away from target
+
+    # - simple reward scales - my own reward logic
+    rew_scale_alive     = 1.0
+    rew_scale_j2_angle  = -10.0    # Joint2 angle penalty - strong
+    rew_scale_j2_vel    = -0.1     # Joint2 velocity penalty
+    rew_scale_j1_vel    = -0.01    # Joint1 velocity penalty
+    rew_scale_j1_action = -0.001   # penalize very large torques on joint1
+    rew_scale_j1_pos    = -0.05    # joint1 arm centering
+    rew_scale_violation = -25.0    # constraint violation penalty
 
     # reward scales from cartpole example
     # rew_scale_terminated = -2.0 
@@ -83,16 +95,11 @@ class RotaryInvPendulumEnvCfg(DirectRLEnvCfg):
     # rew_scale_cart_vel = -0.01
     # rew_scale_pole_vel = -0.005
 
-    # -Disturbance settings -- - from GTech AE4610
-    enable_disturbance = True
-    # Apply disturbance every 5 seconds (5s, 10s, 15s...)
-    disturbance_interval_s = 5.0
-    # How many physics steps should the push last? (40 steps @ 800Hz = 0.05s)
-    disturbance_duration_steps = 40
-    # Range of random force (Nm) applied to Joint2
-    disturbance_range_nm = (-2.0, 2.0)
-
     # - reset states/conditions
     # initial_pole_angle_range = [-0.25, 0.25]  # pole angle sample range on reset [rad]
     # max_cart_pos = 3.0  # reset if cart exceeds this position [m]
-    max_angle_j2 = math.pi
+    max_angle_j2 = math.pi/2
+    _reset_j1_pos_range = math.pi
+    _reset_j1_vel_range = 4.0
+    _reset_j2_pos_noise = math.radians(12)
+    _reset_j2_vel_range = 1.0
