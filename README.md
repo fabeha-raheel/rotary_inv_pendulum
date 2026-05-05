@@ -62,8 +62,11 @@ Important files:
 <!-- - [ ] Robust Sim2Real deployment testing -->
 - [X] Project Documentation
 
-## Results
+## References
 
+[GTech AE4610](https://gtae.gitbook.io/ae4610/lab-4-rotary-inverted-pendulum/d.-reinforcement-learning-controller-demo)
+
+Results
 [Simulation training](https://youtu.be/sADe3SSzM2U)
 [Sim2real Deployment](https://youtube.com/shorts/mVsHmRylsYI) 
 
