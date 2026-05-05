@@ -1,8 +1,70 @@
 # Rotary Inverted Pendulum with RL
 
+This repository contains the code for training control policies for the Rotary Inverted Pendulum (Furuta Pendulum) using IsaacLab.
+
+Pendulum parameters are as follows:
+
+- Mass of Pendulum (m_p) = 407.59g
+- Pendulum Link Length (L_p) = 273mm
+- Mass of rotary arm (m_r) = 400g
+- Rotary arm Link Length (L_r) = 285mm
+
+## How to Implement
+
+1. Make sure IsaacLab is installed and cofigured properly. Then, clone the repository:
+
+    ```bash
+    https://github.com/fabeha-raheel/rotary_inv_pendulum.git
+    ```
+
+2. Register the RL environment with IsaacLab:
+
+    ```bash
+    cd ~/rotary_inv_pendulum
+    python -m pip install -e source/rotary_inv_pendulum
+    ```
+
+    Check if environment is successfully registered by running the following commands:
+
+    ```bash
+    python scripts/list_envs.py
+    ```
+
+3. Run training:
+
+    ```bash
+    ....
+    ```
+
+4. Play the policy:
+
+    ```bash
+    ....
+    ```
+
+5. Check Sim2real deployment
+
+Important files:
+
+- RL Env Config File: `source/rotary_inv_pendulum/rotary_inv_pendulum/tasks/direct/rotary_inv_pendulum/rotary_inv_pendulum_env_cfg.py`
+- RL Env File: `source/rotary_inv_pendulum/rotary_inv_pendulum/tasks/direct/rotary_inv_pendulum/rotary_inv_pendulum_env.py`
+- Pend_balc Config (Articulation cfg): `source/rotary_inv_pendulum/rotary_inv_pendulum/robots/pend_balc.py`
+- RSL_RL PPO Cfg File (RL Hyperparameters): `source/rotary_inv_pendulum/rotary_inv_pendulum/tasks/direct/rotary_inv_pendulum/agents/rsl_rl_ppo_cfg.py`
+
+## TODOs
+
+[X] Direct RL Workflow
+[X] Set observations, actions, rewards and reset conditions
+[X] Train basic policy
+[X] Initial Sim2Real deployment
+[ ] Add Domain Randomization
+[ ] Add curriculum learning
+<!-- [ ] Robust Sim2Real deployment testing -->
+[X] Project Documentation
+
 ## Issues
 
-#### Problem pushing Large .vscode/browse.vc.db files to GitHub
+<details><summary>Problem pushing Large .vscode/browse.vc.db files to GitHub</summary>
 
 If the large files have been commited to git in the last commit, they can be cleared using the following command:
 
@@ -28,7 +90,8 @@ Then force push the code to github:
 git push origin main --force
 ```
 
-Based on the IsaacLab template, .vscode should not be set in gitignore. 
+Based on the IsaacLab template, .vscode should not be set in gitignore.
+</details>
 
 <!-- # Template for Isaac Lab Projects
 
