@@ -33,13 +33,13 @@ Pendulum parameters are as follows:
 3. Run training:
 
     ```bash
-    ....
+    python scripts/rsl_rl/train.py --task=Isaac-Rotary-Inv-Pendulum-Direct-v0 --headless
     ```
 
 4. Play the policy:
 
     ```bash
-    ....
+    python scripts/rsl_rl/play.py --task=Isaac-Rotary-Inv-Pendulum-Direct-v0 --num_envs=256
     ```
 
 5. Check Sim2real deployment
@@ -53,14 +53,19 @@ Important files:
 
 ## TODOs
 
-[X] Direct RL Workflow
-[X] Set observations, actions, rewards and reset conditions
-[X] Train basic policy
-[X] Initial Sim2Real deployment
-[ ] Add Domain Randomization
-[ ] Add curriculum learning
-<!-- [ ] Robust Sim2Real deployment testing -->
-[X] Project Documentation
+- [X] Direct RL Workflow
+- [X] Set observations, actions, rewards and reset conditions
+- [X] Train basic policy
+- [X] Initial Sim2Real deployment
+- [ ] Add Domain Randomization
+- [ ] Add curriculum learning
+<!-- - [ ] Robust Sim2Real deployment testing -->
+- [X] Project Documentation
+
+## Results
+
+[Simulation training](https://youtu.be/sADe3SSzM2U)
+[Sim2real Deployment](https://youtube.com/shorts/mVsHmRylsYI) 
 
 ## Issues
 
